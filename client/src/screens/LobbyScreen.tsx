@@ -10,11 +10,13 @@ import {
 } from '@flipbook/shared';
 import { Avatar } from '../components/Avatar';
 import { socket } from '../lib/store';
+import { ProfileScreen } from './ProfileScreen';
 
 export function LobbyScreen({ room, me }: { room: RoomView; me: string }) {
   const isHost = room.hostId === me;
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [editing, setEditing] = useState(false);
   const count = room.players.length;
 
   const inviteUrl = `${window.location.origin}${window.location.pathname}?room=${room.code}`;
@@ -36,6 +38,8 @@ export function LobbyScreen({ room, me }: { room: RoomView; me: string }) {
 
   const update = (patch: Partial<GameSettings>) => socket.emit('host:settings', patch);
 
+  if (editing) return <ProfileScreen room={room} me={me} onClose={() => setEditing(false)} />;
+
   return (
     <div className="lobby">
       <div className="card room-card">
@@ -54,10 +58,14 @@ export function LobbyScreen({ room, me }: { room: RoomView; me: string }) {
           <ul className="player-list">
             {room.players.map((p) => (
               <li key={p.id} className={p.connected ? '' : 'away'}>
-                <Avatar name={p.nickname} color={p.color} />
+                <Avatar name={p.named ? p.nickname : '?'} color={p.color} />
                 <span className="name">
-                  {p.nickname}
-                  {p.id === me && <span className="tag">you</span>}
+                  {p.named ? p.nickname : <span className="muted">Picking a name…</span>}
+                  {p.id === me && (
+                    <button className="tag tag-button" onClick={() => setEditing(true)} title="Change your name or color">
+                      you · edit
+                    </button>
+                  )}
                   {p.id === room.hostId && <span className="tag host">host</span>}
                   {p.isBot && <span className="tag">bot</span>}
                   {!p.connected && <span className="tag">reconnecting…</span>}

@@ -396,6 +396,56 @@ button {
   text-align: center;
 }
 
+/* ----------------------------------------------------------------- profile */
+
+.profile-card {
+  max-width: 440px;
+  margin: 6vh auto 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.profile-card h2 {
+  margin: 0;
+}
+
+.swatch:disabled {
+  opacity: 0.2;
+  cursor: not-allowed;
+}
+
+.here {
+  margin: 0;
+}
+
+.here-name {
+  font-weight: 600;
+}
+
+.here-name + .here-name::before {
+  content: ', ';
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.profile-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.tag-button {
+  border: none;
+  font: inherit;
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+.tag-button:hover {
+  background: rgba(29, 29, 31, 0.16);
+}
+
 /* ------------------------------------------------------------------- lobby */
 
 .lobby {

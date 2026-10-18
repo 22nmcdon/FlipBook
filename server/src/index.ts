@@ -4,7 +4,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
 import { Server } from 'socket.io';
-import { APP_NAME, ROOM_CODE_LENGTH, type JoinPayload, type Session } from '@flipbook/shared';
+import { APP_NAME, ROOM_CODE_LENGTH, type Session } from '@flipbook/shared';
 import { Room, type GameSocket, type IO } from './room';
 
 const PORT = Number(process.env.PORT ?? 3001);
@@ -48,9 +48,6 @@ function createRoom(): Room {
   return room;
 }
 
-const isJoin = (p: unknown): p is JoinPayload =>
-  typeof p === 'object' && p !== null && typeof (p as JoinPayload).nickname === 'string';
-
 function currentRoom(socket: GameSocket): { room: Room; playerId: string } | null {
   const room = rooms.get(socket.data.code ?? '');
   const playerId = socket.data.playerId;
@@ -69,12 +66,11 @@ io.on('connection', (socket: GameSocket) => {
       if (ctx) fn(ctx, ...args);
     };
 
-  socket.on('room:create', (p, ack) => {
+  socket.on('room:create', (ack) => {
     if (typeof ack !== 'function') return;
-    if (!isJoin(p)) return ack({ ok: false, error: 'Pick a nickname first.' });
     leaveCurrent(socket);
     const room = createRoom();
-    const player = room.addPlayer(p);
+    const player = room.addPlayer();
     if (typeof player === 'string') return ack({ ok: false, error: player });
     room.attach(socket, player);
     console.log(`[${room.code}] created`);
@@ -84,11 +80,11 @@ io.on('connection', (socket: GameSocket) => {
 
   socket.on('room:join', (p, ack) => {
     if (typeof ack !== 'function') return;
-    if (!isJoin(p) || typeof p.code !== 'string') return ack({ ok: false, error: 'Pick a nickname first.' });
-    const room = rooms.get(p.code.trim().toUpperCase());
-    if (!room) return ack({ ok: false, error: `No room with code ${p.code.toUpperCase()}.` });
+    const code = typeof p?.code === 'string' ? p.code.trim().toUpperCase() : '';
+    const room = rooms.get(code);
+    if (!room) return ack({ ok: false, error: `No room with code ${code || '(blank)'}.` });
     leaveCurrent(socket);
-    const player = room.addPlayer(p);
+    const player = room.addPlayer();
     if (typeof player === 'string') return ack({ ok: false, error: player });
     room.attach(socket, player);
     ack({ ok: true, session: { code: room.code, playerId: player.id, token: player.token } });
@@ -102,6 +98,14 @@ io.on('connection', (socket: GameSocket) => {
     leaveCurrent(socket);
     room.attach(socket, player);
     ack({ ok: true });
+  });
+
+  socket.on('player:profile', (p, ack) => {
+    if (typeof ack !== 'function') return;
+    const ctx = currentRoom(socket);
+    if (!ctx) return ack({ ok: false, error: 'You are not in a room.' });
+    const error = ctx.room.setProfile(ctx.playerId, p);
+    ack(error ? { ok: false, error } : { ok: true });
   });
 
   socket.on(

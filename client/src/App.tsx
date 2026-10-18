@@ -5,6 +5,7 @@ import { actions, useGame } from './lib/store';
 import { GameScreen } from './screens/GameScreen';
 import { HomeScreen } from './screens/HomeScreen';
 import { LobbyScreen } from './screens/LobbyScreen';
+import { ProfileScreen } from './screens/ProfileScreen';
 import { RevealScreen } from './screens/RevealScreen';
 
 export function App() {
@@ -54,7 +55,12 @@ export function App() {
 
       {!game.connected && <div className="banner">Connection lost. Reconnecting…</div>}
 
-      {room.phase === 'lobby' && <LobbyScreen room={room} me={me} />}
+      {room.phase === 'lobby' &&
+        (room.players.find((p) => p.id === me)?.named ? (
+          <LobbyScreen room={room} me={me} />
+        ) : (
+          <ProfileScreen room={room} me={me} />
+        ))}
       {room.phase === 'drawing' && (
         <GameScreen room={room} turn={game.turn} turnRound={game.turnRound} isHost={room.hostId === me} />
       )}

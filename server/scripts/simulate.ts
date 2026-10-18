@@ -7,6 +7,7 @@
  *   npm run simulate             # in another (PLAYERS=6 FRAMES=10 to tweak)
  */
 import { io, type Socket } from 'socket.io-client';
+import { AVATAR_COLORS } from '@flipbook/shared';
 import type {
   ClientToServerEvents,
   Frame,
@@ -39,15 +40,25 @@ async function main() {
   const sessions: Session[] = [];
   for (let i = 0; i < PLAYERS; i++) clients.push(await connect());
 
-  const create = await clients[0]!.emitWithAck('room:create', { nickname: 'Sim 0', color: '' });
+  const create = await clients[0]!.emitWithAck('room:create');
   if (!create.ok) throw new Error(create.error);
   sessions.push(create.session);
   const code = create.session.code;
   for (let i = 1; i < PLAYERS; i++) {
-    const res = await clients[i]!.emitWithAck('room:join', { code, nickname: `Sim ${i}`, color: '' });
+    const res = await clients[i]!.emitWithAck('room:join', { code });
     if (!res.ok) throw new Error(res.error);
     sessions.push(res.session);
   }
+
+  // Everyone joins nameless, so starting must wait until all have picked a name.
+  const early = await clients[0]!.emitWithAck('host:start');
+  if (early.ok) throw new Error('game started before players picked names');
+  for (let i = 0; i < PLAYERS; i++) {
+    const res = await clients[i]!.emitWithAck('player:profile', { nickname: `Sim ${i}`, color: AVATAR_COLORS[i]! });
+    if (!res.ok) throw new Error(res.error);
+  }
+  const dupe = await clients[1]!.emitWithAck('player:profile', { nickname: 'sim 0', color: AVATAR_COLORS[1]! });
+  if (dupe.ok) throw new Error('duplicate name was accepted');
   console.log(`room ${code} with ${PLAYERS} players`);
 
   clients[0]!.emit('host:settings', { frameCount: FRAMES });

@@ -24,6 +24,8 @@ export interface PlayerView {
   color: string;
   connected: boolean;
   isBot: boolean;
+  /** False until the player has picked a name and color after joining. */
+  named: boolean;
 }
 
 export interface RoomView {

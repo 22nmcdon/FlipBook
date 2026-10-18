@@ -20,7 +20,6 @@ import {
   type ClientToServerEvents,
   type Frame,
   type GameSettings,
-  type JoinPayload,
   type Phase,
   type RevealView,
   type Rng,
@@ -45,6 +44,7 @@ interface PlayerRec {
   connected: boolean;
   sockets: Set<string>;
   isBot: boolean;
+  named: boolean;
 }
 
 interface ChainRec {
@@ -109,22 +109,56 @@ export class Room {
 
   // ---------------------------------------------------------------- players
 
-  addPlayer(join: JoinPayload, isBot = false): PlayerRec | string {
+  /**
+   * Add a seat to the room. Humans join nameless and pick a name and color
+   * afterwards (setProfile); bots are named straight away.
+   */
+  addPlayer(botName?: string): PlayerRec | string {
     if (this.phase !== 'lobby') return 'That game has already started.';
     if (this.players.size >= MAX_PLAYERS) return 'That room is full.';
 
+    const isBot = botName !== undefined;
     const player: PlayerRec = {
       id: randomUUID(),
       token: randomBytes(16).toString('hex'),
-      nickname: this.uniqueNickname(join.nickname),
-      color: this.pickColor(join.color),
+      nickname: botName ?? '',
+      color: this.freeColor(),
       connected: isBot,
       sockets: new Set(),
       isBot,
+      named: isBot,
     };
     this.players.set(player.id, player);
     if (!this.hostId) this.hostId = player.id;
     return player;
+  }
+
+  /** Set a player's name and color. Returns an error message, or null on success. */
+  setProfile(playerId: string, profile: unknown): string | null {
+    const player = this.players.get(playerId);
+    if (!player) return 'You are not in this room.';
+    if (this.phase !== 'lobby') return "Names can't change during a game.";
+    const p = (typeof profile === 'object' && profile !== null ? profile : {}) as Record<string, unknown>;
+
+    const nickname = sanitizeWord(p.nickname).slice(0, MAX_NICKNAME_LENGTH);
+    if (!nickname) return 'Pick a nickname first.';
+    // Only chosen names and colors count; a nameless player's placeholder color is up for grabs.
+    const others = [...this.players.values()].filter((o) => o.id !== playerId && o.named);
+    if (others.some((o) => o.nickname.toLowerCase() === nickname.toLowerCase())) {
+      return 'Someone in this room already has that name.';
+    }
+    const color = typeof p.color === 'string' ? p.color : '';
+    if (!(AVATAR_COLORS as readonly string[]).includes(color)) return 'Pick a color.';
+    if (others.some((o) => o.color === color)) return 'Someone just took that color. Pick another.';
+
+    player.nickname = nickname;
+    player.color = color;
+    player.named = true;
+    for (const o of this.players.values()) {
+      if (!o.named && o.color === color) o.color = this.freeColor();
+    }
+    this.broadcastState();
+    return null;
   }
 
   attach(socket: GameSocket, player: PlayerRec) {
@@ -214,9 +248,9 @@ export class Room {
 
   addBot(by: string) {
     if (by !== this.hostId || this.phase !== 'lobby' || !this.botsAllowed) return;
-    const taken = new Set([...this.players.values()].map((p) => p.nickname));
-    const name = BOT_NAMES.find((n) => !taken.has(n)) ?? 'Bot';
-    const result = this.addPlayer({ nickname: name, color: '' }, true);
+    const taken = new Set([...this.players.values()].map((p) => p.nickname.toLowerCase()));
+    const name = BOT_NAMES.find((n) => !taken.has(n.toLowerCase())) ?? `Bot ${this.players.size + 1}`;
+    const result = this.addPlayer(name);
     if (typeof result !== 'string') this.broadcastState();
   }
 
@@ -230,6 +264,10 @@ export class Room {
     if (this.phase !== 'lobby') return 'The game has already started.';
     for (const p of [...this.players.values()]) if (!p.connected) this.removePlayer(p.id);
     if (this.players.size < MIN_PLAYERS) return `You need at least ${MIN_PLAYERS} players.`;
+    const picking = [...this.players.values()].filter((p) => !p.named).length;
+    if (picking > 0) {
+      return `Waiting for ${picking} ${picking === 1 ? 'player' : 'players'} to pick a name. You can kick them if they're stuck.`;
+    }
 
     this.gameNumber++;
     const seed = `${this.id}:${this.gameNumber}`;
@@ -407,6 +445,7 @@ export class Room {
         color: p.color,
         connected: p.connected,
         isBot: p.isBot,
+        named: p.named,
       })),
       round: this.round,
       deadline: this.deadline,
@@ -489,20 +528,9 @@ export class Room {
     return `${this.code}:${playerId}`;
   }
 
-  private uniqueNickname(raw: string): string {
-    const base =
-      sanitizeWord(typeof raw === 'string' ? raw : '').slice(0, MAX_NICKNAME_LENGTH) || `Player ${this.players.size + 1}`;
-    const taken = new Set([...this.players.values()].map((p) => p.nickname.toLowerCase()));
-    if (!taken.has(base.toLowerCase())) return base;
-    for (let i = 2; ; i++) {
-      const name = `${base.slice(0, MAX_NICKNAME_LENGTH - 2)} ${i}`;
-      if (!taken.has(name.toLowerCase())) return name;
-    }
-  }
-
-  private pickColor(requested: string): string {
+  /** A color nobody in the room is using yet (or any color once all are taken). */
+  private freeColor(): string {
     const used = new Set([...this.players.values()].map((p) => p.color));
-    if ((AVATAR_COLORS as readonly string[]).includes(requested) && !used.has(requested)) return requested;
     return AVATAR_COLORS.find((c) => !used.has(c)) ?? pick(AVATAR_COLORS, Math.random);
   }
 

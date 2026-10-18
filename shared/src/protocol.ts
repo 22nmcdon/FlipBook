@@ -9,7 +9,7 @@ export interface Session {
   token: string;
 }
 
-export interface JoinPayload {
+export interface ProfilePayload {
   nickname: string;
   color: string;
 }
@@ -23,10 +23,12 @@ export interface ServerToClientEvents {
 }
 
 export interface ClientToServerEvents {
-  'room:create': (p: JoinPayload, ack: Ack<{ session: Session }>) => void;
-  'room:join': (p: JoinPayload & { code: string }, ack: Ack<{ session: Session }>) => void;
+  'room:create': (ack: Ack<{ session: Session }>) => void;
+  'room:join': (p: { code: string }, ack: Ack<{ session: Session }>) => void;
   'room:resume': (p: Session, ack: Ack) => void;
   'room:leave': () => void;
+  /** Set your name and color. Allowed in the lobby only. */
+  'player:profile': (p: ProfilePayload, ack: Ack) => void;
 
   'host:settings': (p: Partial<GameSettings>) => void;
   'host:start': (ack: Ack) => void;

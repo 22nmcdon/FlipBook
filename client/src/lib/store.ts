@@ -2,7 +2,7 @@ import { useSyncExternalStore } from 'react';
 import { io, type Socket } from 'socket.io-client';
 import type {
   ClientToServerEvents,
-  JoinPayload,
+  ProfilePayload,
   RevealView,
   RoomView,
   ServerToClientEvents,
@@ -104,17 +104,21 @@ function enter(session: Session) {
 }
 
 export const actions = {
-  async create(join: JoinPayload): Promise<string | null> {
-    const res = await socket.emitWithAck('room:create', join);
+  async create(): Promise<string | null> {
+    const res = await socket.emitWithAck('room:create');
     if (!res.ok) return res.error;
     enter(res.session);
     return null;
   },
-  async join(code: string, join: JoinPayload): Promise<string | null> {
-    const res = await socket.emitWithAck('room:join', { ...join, code });
+  async join(code: string): Promise<string | null> {
+    const res = await socket.emitWithAck('room:join', { code });
     if (!res.ok) return res.error;
     enter(res.session);
     return null;
+  },
+  async setProfile(profile: ProfilePayload): Promise<string | null> {
+    const res = await socket.emitWithAck('player:profile', profile);
+    return res.ok ? null : res.error;
   },
   leave() {
     socket.emit('room:leave');
