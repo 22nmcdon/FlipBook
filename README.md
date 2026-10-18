@@ -41,6 +41,8 @@ On Render, create a **Web Service** from this repo:
 | Health check path | `/healthz` |
 | Instances | 1 |
 
+**Branches:** Render deploys every push to `main`, so `main` is always the live site. Do day-to-day work on `dev`, test it locally with `npm run dev`, and merge `dev` into `main` only to ship. Avoid shipping while people are mid-game, because a deploy restarts the server.
+
 Render reads the Node version from `engines` in `package.json` and provides `PORT` itself. On the free plan the service sleeps when idle, and the first visit wakes it in about a minute. Sleeping or redeploying ends any games in progress.
 
 ## Layout
