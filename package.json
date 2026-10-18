@@ -1,0 +1,21 @@
+{
+  "name": "flipbook-phone",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "shared",
+    "server",
+    "client"
+  ],
+  "scripts": {
+    "dev": "concurrently -k -n server,client -c blue,magenta \"npm run dev -w server\" \"npm run dev -w client\"",
+    "build": "npm run build -w client",
+    "start": "npm run start -w server",
+    "test": "npm test -w shared",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "simulate": "npm run simulate -w server"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.6"
+  }
+}
