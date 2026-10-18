@@ -28,6 +28,21 @@ Open http://localhost:5173. Create a room, then use **+ Add a test bot** (dev on
 
 Set `ALLOW_BOTS=1` to enable test bots in production.
 
+## Deploying (Render)
+
+The game is one Node process that serves the page and the socket, with rooms kept in memory. Any host works if it runs a long-lived Node server with WebSockets, as **exactly one instance**. Static hosts like GitHub Pages can't run it.
+
+On Render, create a **Web Service** from this repo:
+
+| Setting | Value |
+|---|---|
+| Build command | `npm ci --include=dev && npm run build` |
+| Start command | `npm start` |
+| Health check path | `/healthz` |
+| Instances | 1 |
+
+Render reads the Node version from `engines` in `package.json` and provides `PORT` itself. On the free plan the service sleeps when idle, and the first visit wakes it in about a minute. Sleeping or redeploying ends any games in progress.
+
 ## Layout
 
 ```
