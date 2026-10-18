@@ -32,14 +32,18 @@ export function TurnScreen({ turn, onSubmitted }: { turn: TurnView; onSubmitted:
   const left = useCountdown(turn.deadline);
 
   // --- history ------------------------------------------------------------
-  const commit = useCallback(
-    (next: Stroke[]) => {
-      setUndoStack((u) => [...u.slice(-MAX_UNDO + 1), strokes]);
-      setRedoStack([]);
-      setStrokes(next);
-    },
-    [strokes],
-  );
+  // Mirror of `strokes` that updates immediately, so two strokes finishing
+  // before the next render (e.g. two fingers) don't overwrite each other.
+  const current = useRef(strokes);
+  current.current = strokes;
+  const commit = useCallback((update: (prev: Stroke[]) => Stroke[]) => {
+    const prev = current.current;
+    const next = update(prev);
+    current.current = next;
+    setUndoStack((u) => [...u.slice(-MAX_UNDO + 1), prev]);
+    setRedoStack([]);
+    setStrokes(next);
+  }, []);
   const undo = useCallback(() => {
     if (undoStack.length === 0) return;
     setRedoStack((r) => [...r, strokes]);
@@ -156,7 +160,7 @@ export function TurnScreen({ turn, onSubmitted }: { turn: TurnView; onSubmitted:
           onion={turn.prevFrames}
           showOnion={showOnion}
           tool={{ color, size, erase }}
-          onStroke={(s) => commit([...strokes, s])}
+          onStroke={(s) => commit((prev) => [...prev, s])}
         />
       </div>
 
@@ -168,7 +172,7 @@ export function TurnScreen({ turn, onSubmitted }: { turn: TurnView; onSubmitted:
           <button className="btn ghost" onClick={redo} disabled={redoStack.length === 0} title="Redo (⇧⌘Z)">
             ↷ Redo
           </button>
-          <button className="btn ghost" onClick={() => commit([])} disabled={strokes.length === 0}>
+          <button className="btn ghost" onClick={() => commit(() => [])} disabled={strokes.length === 0}>
             Clear
           </button>
           {turn.prevFrames.length > 0 && (
